@@ -1,5 +1,4 @@
 from extra_functions import pg, ch, clean_values_in_rows, check_insert, partition_rows_fixed_batch
-from collections import defaultdict
 from airflow.sdk import dag, task
 from datetime import datetime
 import pickle
@@ -614,6 +613,72 @@ DIMENSIONS = {
                           INNER JOIN Person.CountryRegion cr ON st.CountryRegionCode = cr.CountryRegionCode
                  ORDER BY st."group", cr.Name;
                  """
+    },
+}
+
+STATIC_LOOKUPS = {
+    "DimFeedbackCategory": {
+        "Columns": [
+            "FeedbackCategoryKey",
+            "FeedbackCategoryID",
+            "CategoryName",
+            "CategoryDescription"
+        ],
+        "Data": [
+        (1, 1, 'Product Quality', 'Issues related to product quality'),
+        (2, 2, 'Service', 'Customer service related feedback'),
+        (3, 3, 'Delivery', 'Shipping and delivery feedback'),
+        (4, 4, 'Pricing', 'Price-related feedback'),
+        (5, 5, 'General', 'General comments')
+        ]
+    },
+    "DimCustomerSegment": {
+        "Columns": [
+            "SegmentKey",
+            "SegmentID",
+            "SegmentName",
+            "SegmentDescription",
+            "DiscountTierStart",
+            "DiscountTierEnd"
+        ],
+        "Data": [
+            (1, 1, 'Premium', 'Customers with income > $150K', 20.00, 100.00),
+            (2, 2, 'Gold', 'Customers with income $100K-$150K', 15.00, 19.99),
+            (3, 3, 'Silver', 'Customers with income $50K-$100K', 10.00, 14.99),
+            (4, 4, 'Bronze', 'Customers with income $25K-$50K', 5.00, 9.99),
+            (5, 5, 'Standard', 'Customers with income < $25K', 0.00, 4.99),
+            (6, 6, 'Business', 'B2B customers', 15.00, 100.00)
+        ]
+    },
+    "DimAgingTier": {
+        "Columns": [
+            "AgingTierKey",
+            "AgingTierID",
+            "AgingTierName",
+            "MinAgingDays",
+            "MaxAgingDays"
+        ],
+        "Data": [
+            (1, 1, 'Fresh', 0, 30),
+            (2, 2, 'Aging', 31, 90),
+            (3, 3, 'Old', 91, 180),
+            (4, 4, 'Obsolete', 181, 999999)
+        ]
+    },
+    "DimFinanceCategory":{
+        "Columns": [
+            "FinanceCategoryKey",
+            "FinanceCategoryID",
+            "CategoryName",
+            "CategoryDescription"
+        ],
+        "Data": [
+            (1, 1, 'Small Transaction', 'Transaction < $100'),
+            (2, 2, 'Medium Transaction', 'Transaction $100-$1000'),
+            (3, 3, 'Large Transaction', 'Transaction $1000-$10000'),
+            (4, 4, 'Enterprise Transaction', 'Transaction > $10000'),
+            (5, 5, 'Credit Transaction', 'Credit-based purchases')
+        ]
     }
 }
 
@@ -664,7 +729,7 @@ def populate():
             with open(clean_file_path, 'rb') as file:
                 data = pickle.load(file)
 
-            partitioned = partition_rows_fixed_batch(data, batch_size=70)
+            partitioned = partition_rows_fixed_batch(data, batch_size=200)
 
             total_inserted = 0
 
@@ -689,6 +754,16 @@ def populate():
             print(f"First row causing issue: {data[0] if data else 'No data'}")
             raise
 
+    @task()
+    def insert_static_dimension_columns(data, table, columns):
+        client = ch()
+
+        client.insert(
+            f"ADVENTUREWORKS_DWS.{table}",
+            data,
+            columns
+        )
+
     for table, content in DIMENSIONS.items():
 
         columns = content["Columns"]
@@ -699,5 +774,12 @@ def populate():
         idc = insert_dimension_columns.override(task_display_name=f"Insert Into {table}")(edd, columns, table)
 
         edc >> edd >> idc
+
+    for table, items in STATIC_LOOKUPS.items():
+        col = items["Columns"]
+        dat = items["Data"]
+        idc = insert_static_dimension_columns.override(task_display_name=f"Insert Into Static {table}")(dat, table, col)
+
+        idc
 
 populate()

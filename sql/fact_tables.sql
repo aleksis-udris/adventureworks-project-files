@@ -9,10 +9,10 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactSales (
 
     -- Savienojumi ar dimensijām
     SalesDateKey Date,
-    CustomerID UInt32,
-    ProductID UInt32,
-    StoreID UInt32,
-    EmployeeID UInt32,
+    CustomerKey UInt64,
+    ProductKey UInt64,
+    StoreKey UInt64,
+    EmployeeKey UInt64,
 
     -- "Grain"
     SalesOrderID UInt32,
@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactSales (
 ORDER BY
     (
         SalesDateKey,
-        ProductID,
-        CustomerID,
-        StoreID,
+        ProductKey,
+        CustomerKey,
+        StoreKey,
         SalesOrderID,
         SalesOrderDetailID
     );
@@ -46,10 +46,8 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactPurchases (
 
     -- Savienojumi ar dimensijām
     PurchaseDateKey Date,
-    CustomerID UInt32,
-    ProductID UInt32,
-    StoreID UInt32,
-    EmployeeID UInt32,
+    VendorKey UInt64,
+    ProductKey UInt64,
 
     -- "Grain"
     PurchaseOrderID UInt32,
@@ -70,25 +68,24 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactPurchases (
 ORDER BY
     (
         PurchaseDateKey,
-        ProductID,
-        CustomerID,
-        StoreID,
+        ProductKey,
+        VendorKey,
         PurchaseOrderID,
         PurchaseOrderDetailID
     );
 
 -- Inventory Facts
 DROP TABLE IF EXISTS ADVENTUREWORKS_DWS.FactInventory;
-CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactInvertory (
+CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactInventory (
 
     -- Savienojumi ar dimensijām
     InventoryDateKey Date,
-    ProductKey UInt32,
-    StoreKey UInt32,
-    WarehouseKey UInt32,
+    ProductKey UInt64,
+    StoreKey UInt64,
+    WarehouseKey UInt64,
 
     -- Atribūti
-    quantityOnHand UInt32,
+    QuantityOnHand UInt32,
     StockAging UInt32,
     ReorderLevel UInt32,
     SafetyStockLevels UInt32,
@@ -114,8 +111,8 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactProduction (
 
     -- Savienojumi ar Dimensijām
     ProductionDateKey Date,
-    ProductKey UInt32,
-    SupervisorKey UInt32,
+    ProductKey UInt64,
+    SupervisorKey UInt64,
 
     -- Atribūti
     UnitsProduced UInt32,
@@ -140,9 +137,9 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactEmployeeSales (
 
     -- Savienojumi ar dimensijām
     SalesDateKey Date,
-    EmployeeKey UInt32,
-    StoreKey UInt32,
-    SalesTerritoryKey UInt32,
+    EmployeeKey UInt64,
+    StoreKey UInt64,
+    SalesTerritoryKey UInt64,
 
     -- Atribūti
     SalesAmount Decimal(18, 2),
@@ -168,9 +165,9 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactCustomerFeedback (
 
     -- Savienojumi ar Dimensijām
     FeedbackDateKey Date,
-    CustomerKey UInt32,
-    EmployeeKey UInt32,
-    FeedbackCategoryKey UInt32,
+    CustomerKey UInt64,
+    EmployeeKey UInt64,
+    FeedbackCategoryKey UInt64,
 
     -- Atribūti
     FeedbackScore UInt8,
@@ -198,9 +195,9 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactPromotionResponse (
 
     -- Savienojumi ar Dimensijām
     PromotionDateKey Date,
-    ProductKey UInt32,
-    StoreKey UInt32,
-    PromotionKey UInt32,
+    ProductKey UInt64,
+    StoreKey UInt64,
+    PromotionKey UInt64,
 
     -- Atribūti
     SalesDuringCampaign Decimal(18, 2),
@@ -225,9 +222,9 @@ DROP TABLE IF EXISTS ADVENTUREWORKS_DWS.FactFinance;
 CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactFinance (
     -- Savienojumi ar Dimensijām
     InvoiceDateKey Date,
-    CustomerKey UInt32,
-    StoreKey UInt32,
-    FinanceCategoryKey UInt32,
+    CustomerKey UInt64,
+    StoreKey UInt64,
+    FinanceCategoryKey UInt64,
 
     -- Atribūti
     InvoiceAmount Decimal(18, 2),
@@ -254,10 +251,10 @@ DROP TABLE IF EXISTS ADVENTUREWORKS_DWS.FactReturns;
 CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactReturns (
     -- Savienojumi ar Dimensijām
     ReturnDateKey Date,
-    ProductKey UInt32,
-    CustomerKey UInt32,
-    StoreKey UInt32,
-    ReturnReasonKey UInt32,
+    ProductKey UInt64,
+    CustomerKey UInt64,
+    StoreKey UInt64,
+    ReturnReasonKey UInt64,
 
     -- Atribūti
     ReturnedQuantity UInt32,
@@ -271,7 +268,7 @@ CREATE TABLE IF NOT EXISTS ADVENTUREWORKS_DWS.FactReturns (
     -- "Grain"
     ETLBatchID String,
     LoadTimestamp DateTime
-) ENGINE = MergeTree PARTITION BY ReturnDateKey
+) ENGINE = MergeTree() PARTITION BY ReturnDateKey
 ORDER BY
     (
         ReturnDateKey,

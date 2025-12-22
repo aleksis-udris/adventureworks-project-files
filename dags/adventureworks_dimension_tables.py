@@ -1,7 +1,7 @@
 from datetime import date, datetime
 import json
 import pickle
-
+import gc
 from airflow.sdk import dag, task
 
 from extra_functions import (
@@ -126,17 +126,17 @@ customer_base AS (
         COALESCE(c.ModifiedDate, CURRENT_DATE) AS EffectiveStartDate,
         DATE '9999-12-31' AS EffectiveEndDate,
         1::BIGINT AS Version
-    FROM Sales.Customer c
-    LEFT JOIN Person.Person p ON c.PersonID = p.BusinessEntityID
-    LEFT JOIN Sales.Store s ON c.StoreID = s.BusinessEntityID
-    LEFT JOIN Person.EmailAddress ea ON ea.BusinessEntityID = c.PersonID
-    LEFT JOIN Person.PersonPhone pp ON pp.BusinessEntityID = c.PersonID
-    LEFT JOIN Person.BusinessEntityAddress bea ON bea.BusinessEntityID = COALESCE(c.PersonID, c.StoreID)
-    LEFT JOIN Person.Address addr ON addr.AddressID = bea.AddressID
-    LEFT JOIN Person.StateProvince sp ON sp.StateProvinceID = addr.StateProvinceID
-    LEFT JOIN Person.CountryRegion cr ON cr.CountryRegionCode = sp.CountryRegionCode
-    LEFT JOIN Sales.vPersonDemographics pd ON c.PersonID = pd.BusinessEntityID
-    LEFT JOIN customer_sales cs ON c.CustomerID = cs.CustomerID
+    FROM Sales.Customer AS c
+    LEFT JOIN Person.Person AS p ON c.PersonID = p.BusinessEntityID
+    LEFT JOIN Sales.Store AS s ON c.StoreID = s.BusinessEntityID
+    LEFT JOIN Person.EmailAddress AS ea ON ea.BusinessEntityID = c.PersonID
+    LEFT JOIN Person.PersonPhone AS pp ON pp.BusinessEntityID = c.PersonID
+    LEFT JOIN Person.BusinessEntityAddress AS bea ON bea.BusinessEntityID = COALESCE(c.PersonID, c.StoreID)
+    LEFT JOIN Person.Address AS addr ON addr.AddressID = bea.AddressID
+    LEFT JOIN Person.StateProvince AS sp ON sp.StateProvinceID = addr.StateProvinceID
+    LEFT JOIN Person.CountryRegion AS cr ON cr.CountryRegionCode = sp.CountryRegionCode
+    LEFT JOIN Sales.vPersonDemographics AS pd ON c.PersonID = pd.BusinessEntityID
+    LEFT JOIN customer_sales AS cs ON c.CustomerID = cs.CustomerID
 )
 SELECT * FROM customer_base
 ORDER BY CustomerKey;
@@ -205,10 +205,10 @@ ORDER BY CustomerKey;
                 COALESCE(p.SellStartDate, p.ModifiedDate) AS EffectiveStartDate,
                 COALESCE(p.SellEndDate, DATE '9999-12-31') AS EffectiveEndDate,
                 1::BIGINT AS Version
-            FROM Production.Product p
-            LEFT JOIN Production.ProductSubcategory psc ON p.ProductSubcategoryID = psc.ProductSubcategoryID
-            LEFT JOIN Production.ProductCategory pc ON psc.ProductCategoryID = pc.ProductCategoryID
-            LEFT JOIN Production.ProductModel pm ON p.ProductModelID = pm.ProductModelID
+            FROM Production.Product AS p
+            LEFT JOIN Production.ProductSubcategory AS psc ON p.ProductSubcategoryID = psc.ProductSubcategoryID
+            LEFT JOIN Production.ProductCategory AS pc ON psc.ProductCategoryID = pc.ProductCategoryID
+            LEFT JOIN Production.ProductModel AS pm ON p.ProductModelID = pm.ProductModelID
             ORDER BY p.ProductID;
         """,
     },
@@ -295,14 +295,14 @@ ORDER BY CustomerKey;
                 1 AS IsCurrent,
                 s.ModifiedDate AS SourceUpdateDate,
                 1::BIGINT AS Version
-            FROM Sales.Store s
-            LEFT JOIN Person.BusinessEntityAddress bea ON s.BusinessEntityID = bea.BusinessEntityID
-            LEFT JOIN Person.Address a ON bea.AddressID = a.AddressID
-            LEFT JOIN Person.StateProvince sp ON a.StateProvinceID = sp.StateProvinceID
-            LEFT JOIN Person.CountryRegion cr ON sp.CountryRegionCode = cr.CountryRegionCode
-            LEFT JOIN Sales.SalesTerritory st ON sp.TerritoryID = st.TerritoryID
-            LEFT JOIN Sales.SalesPerson sp_sales ON s.SalesPersonID = sp_sales.BusinessEntityID
-            LEFT JOIN Person.Person mgr ON sp_sales.BusinessEntityID = mgr.BusinessEntityID
+            FROM Sales.Store AS s
+            LEFT JOIN Person.BusinessEntityAddress AS bea ON s.BusinessEntityID = bea.BusinessEntityID
+            LEFT JOIN Person.Address AS a ON bea.AddressID = a.AddressID
+            LEFT JOIN Person.StateProvince AS sp ON a.StateProvinceID = sp.StateProvinceID
+            LEFT JOIN Person.CountryRegion AS cr ON sp.CountryRegionCode = cr.CountryRegionCode
+            LEFT JOIN Sales.SalesTerritory AS st ON sp.TerritoryID = st.TerritoryID
+            LEFT JOIN Sales.SalesPerson AS sp_sales ON s.SalesPersonID = sp_sales.BusinessEntityID
+            LEFT JOIN Person.Person AS mgr ON sp_sales.BusinessEntityID = mgr.BusinessEntityID
             ORDER BY s.BusinessEntityID;
         """,
     },
@@ -347,13 +347,13 @@ ORDER BY CustomerKey;
                 CASE WHEN e.CurrentFlag THEN 1 ELSE 0 END AS IsCurrent,
                 e.ModifiedDate AS SourceUpdateDate,
                 1::BIGINT AS Version
-            FROM HumanResources.Employee e
-            INNER JOIN Person.Person p ON e.BusinessEntityID = p.BusinessEntityID
-            LEFT JOIN HumanResources.EmployeeDepartmentHistory edh
+            FROM HumanResources.Employee AS e
+            INNER JOIN Person.Person AS p ON e.BusinessEntityID = p.BusinessEntityID
+            LEFT JOIN HumanResources.EmployeeDepartmentHistory AS edh
                 ON e.BusinessEntityID = edh.BusinessEntityID AND edh.EndDate IS NULL
-            LEFT JOIN HumanResources.Department d ON edh.DepartmentID = d.DepartmentID
-            LEFT JOIN Sales.SalesPerson sp ON e.BusinessEntityID = sp.BusinessEntityID
-            LEFT JOIN Sales.SalesTerritory st ON sp.TerritoryID = st.TerritoryID
+            LEFT JOIN HumanResources.Department AS d ON edh.DepartmentID = d.DepartmentID
+            LEFT JOIN Sales.SalesPerson AS sp ON e.BusinessEntityID = sp.BusinessEntityID
+            LEFT JOIN Sales.SalesTerritory AS st ON sp.TerritoryID = st.TerritoryID
             ORDER BY e.BusinessEntityID;
         """,
     },
@@ -395,7 +395,7 @@ ORDER BY CustomerKey;
                 so.StartDate,
                 so.EndDate,
                 CASE WHEN CURRENT_DATE BETWEEN so.StartDate AND so.EndDate THEN 1 ELSE 0 END AS IsActive
-            FROM Sales.SpecialOffer so
+            FROM Sales.SpecialOffer AS so
             ORDER BY so.SpecialOfferID;
         """,
     },
@@ -413,7 +413,7 @@ ORDER BY CustomerKey;
                 pc.ProductCategoryID,
                 pc.Name AS CategoryName,
                 pc.Name AS CategoryDescription
-            FROM Production.ProductCategory pc
+            FROM Production.ProductCategory AS pc
             ORDER BY pc.ProductCategoryID;
         """,
     },
@@ -427,6 +427,7 @@ ORDER BY CustomerKey;
             "ValidFromDate",
             "ValidToDate",
             "IsCurrent",
+            "Version",
         ],
         "NaturalKey": "WarehouseID",
         "Query": """
@@ -438,13 +439,10 @@ ORDER BY CustomerKey;
                 'Manufacturing' AS WarehouseType,
                 l.ModifiedDate AS ValidFromDate,
                 DATE '9999-12-31' AS ValidToDate,
-                1 AS IsCurrent
+                1 AS IsCurrent,
+                1::BIGINT Version
             FROM Production.Location AS l
-            JOIN Production.WorkOrderRouting AS wor ON l.LocationID = wor.LocationID
-            JOIN HumanResources.EmployeeDepartmentHistory AS edh ON wor.OperationSequence % 10 = edh.ShiftID
-            JOIN HumanResources.Employee AS e ON edh.BusinessEntityID = e.BusinessEntityID
-            JOIN HumanResources.Department AS d ON edh.DepartmentID = d.DepartmentID
-            ORDER BY l.LocationID, d.DepartmentID;
+            ORDER BY l.LocationID;
         """,
     },
     "DimSalesTerritory": {
@@ -467,7 +465,7 @@ ORDER BY CustomerKey;
                 st.CountryRegionCode AS Country,
                 'TBD' AS Manager,
                 CAST(st.CostYTD AS DECIMAL(18, 2)) AS SalesTarget
-            FROM Sales.SalesTerritory st
+            FROM Sales.SalesTerritory AS st
             ORDER BY st.TerritoryID;
         """,
     },
@@ -525,16 +523,16 @@ ORDER BY CustomerKey;
                 DATE '9999-12-31' AS ValidToDate,
                 CASE WHEN v.ActiveFlag THEN 1 ELSE 0 END AS IsCurrent,
                 v.ModifiedDate AS SourceUpdateDate
-            FROM Purchasing.Vendor v
-            LEFT JOIN vendor_performance vp ON v.BusinessEntityID = vp.VendorID
-            LEFT JOIN Person.BusinessEntityContact bec ON v.BusinessEntityID = bec.BusinessEntityID
-            LEFT JOIN Person.Person cp ON bec.PersonID = cp.BusinessEntityID
-            LEFT JOIN Person.EmailAddress ea ON bec.PersonID = ea.BusinessEntityID
-            LEFT JOIN Person.PersonPhone ph ON bec.PersonID = ph.BusinessEntityID
-            LEFT JOIN Person.BusinessEntityAddress bea ON v.BusinessEntityID = bea.BusinessEntityID
-            LEFT JOIN Person.Address a ON bea.AddressID = a.AddressID
-            LEFT JOIN Person.StateProvince sp ON a.StateProvinceID = sp.StateProvinceID
-            LEFT JOIN Person.CountryRegion cr ON sp.CountryRegionCode = cr.CountryRegionCode
+            FROM Purchasing.Vendor AS v
+            LEFT JOIN vendor_performance AS vp ON v.BusinessEntityID = vp.VendorID
+            LEFT JOIN Person.BusinessEntityContact AS bec ON v.BusinessEntityID = bec.BusinessEntityID
+            LEFT JOIN Person.Person AS cp ON bec.PersonID = cp.BusinessEntityID
+            LEFT JOIN Person.EmailAddress AS ea ON bec.PersonID = ea.BusinessEntityID
+            LEFT JOIN Person.PersonPhone AS ph ON bec.PersonID = ph.BusinessEntityID
+            LEFT JOIN Person.BusinessEntityAddress AS bea ON v.BusinessEntityID = bea.BusinessEntityID
+            LEFT JOIN Person.Address AS a ON bea.AddressID = a.AddressID
+            LEFT JOIN Person.StateProvince AS sp ON a.StateProvinceID = sp.StateProvinceID
+            LEFT JOIN Person.CountryRegion AS cr ON sp.CountryRegionCode = cr.CountryRegionCode
             ORDER BY v.BusinessEntityID;
         """,
     },
@@ -549,20 +547,16 @@ ORDER BY CustomerKey;
         ],
         "NaturalKey": "RegionID",
         "Query": """
-            SELECT DISTINCT
-                ('x' || MD5(COALESCE(st."group", '') || '|' || COALESCE(cr.Name, '')))::bit(32)::BIGINT AS RegionKey,
+            SELECT
+                ('x' || MD5(COALESCE(ROW_NUMBER() OVER (ORDER BY st."group", cr.Name), 0::BIGINT) || COALESCE(st."group", '') || '|' || COALESCE(cr.Name, '')))::bit(32)::BIGINT AS RegionKey,
+
                 ROW_NUMBER() OVER (ORDER BY st."group", cr.Name) AS RegionID,
                 st."group" AS RegionName,
-                cr.Name AS Country,
-                CASE
-                    WHEN cr.Name IN ('United States', 'Canada') THEN 'North America'
-                    WHEN cr.Name IN ('United Kingdom', 'Germany', 'France') THEN 'Europe'
-                    WHEN cr.Name IN ('Australia') THEN 'Asia Pacific'
-                    ELSE 'Other'
-                END AS Continent,
+                st."name" AS Country,
+                st."group" AS Continent,
                 'UTC' AS TimeZone
-            FROM Sales.SalesTerritory st
-            INNER JOIN Person.CountryRegion cr ON st.CountryRegionCode = cr.CountryRegionCode
+            FROM Sales.SalesTerritory AS st
+            INNER JOIN Person.CountryRegion AS cr ON st.CountryRegionCode = cr.CountryRegionCode
             ORDER BY st."group", cr.Name;
         """,
     },
@@ -649,6 +643,8 @@ STATIC_LOOKUPS = {
     },
 }
 
+MAX_ROWS_IN_MEMORY = 100000  # Safety limit
+
 
 def _has_scd_columns(columns) -> bool:
     required = {"IsCurrent", "ValidFromDate", "ValidToDate", "Version"}
@@ -656,6 +652,7 @@ def _has_scd_columns(columns) -> bool:
 
 
 def _coerce_to_date(value):
+    """Safely convert various date types to date object"""
     if value is None:
         return date.today()
     if isinstance(value, date) and not isinstance(value, datetime):
@@ -671,6 +668,7 @@ def _coerce_to_date(value):
 
 
 def _sql_quote(value) -> str:
+    """Safely quote string values for SQL"""
     if isinstance(value, str):
         v = value.replace("\\", "\\\\").replace("'", "\\'")
         return f"'{v}'"
@@ -678,8 +676,8 @@ def _sql_quote(value) -> str:
 
 
 def _date_sql(d: date) -> str:
+    """Convert date to ClickHouse date literal"""
     return f"toDate('{d.isoformat()}')"
-
 
 @dag(
     dag_id="adventureworks_dimension_sync",
@@ -730,30 +728,97 @@ def populate():
 
     @task
     def sync_dimension_table(table, columns, natural_key, pg_file, ch_file):
-        client = ch()
+        """
+        Synchronize dimension table between PostgreSQL source and ClickHouse warehouse.
+        Handles both SCD Type 2 and regular dimension tables.
+        """
+        client = None
         processing_batch_id = f"{table}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         error_rows = []
-        with open(pg_file, "rb") as pg_file_data:
-            pg_rows = pickle.load(pg_file_data)
-        with open(ch_file, "rb") as ch_file_data:
-            ch_rows = pickle.load(ch_file_data)
+
+        print(f"[{table}] Starting sync for batch {processing_batch_id}")
+
         try:
+            # Load data from pickle files
+            print(f"[{table}] Loading PostgreSQL data...")
+            with open(pg_file, "rb") as pg_file_data:
+                pg_rows = pickle.load(pg_file_data)
+            print(f"[{table}] Loaded {len(pg_rows)} rows from PostgreSQL")
+
+            # Check row count safety
+            if len(pg_rows) > MAX_ROWS_IN_MEMORY:
+                raise Exception(f"PostgreSQL data too large: {len(pg_rows)} rows (max: {MAX_ROWS_IN_MEMORY})")
+
+            print(f"[{table}] Loading ClickHouse data...")
+            with open(ch_file, "rb") as ch_file_data:
+                ch_rows = pickle.load(ch_file_data)
+            print(f"[{table}] Loaded {len(ch_rows)} rows from ClickHouse")
+
+            if len(ch_rows) > MAX_ROWS_IN_MEMORY:
+                raise Exception(f"ClickHouse data too large: {len(ch_rows)} rows (max: {MAX_ROWS_IN_MEMORY})")
+
+            client = ch()
+
             nk_idx = columns.index(natural_key)
             is_scd = _has_scd_columns(columns)
+
+            print(f"[{table}] Is SCD: {is_scd}, Natural Key: {natural_key} (index: {nk_idx})")
+
+            # Get SCD column indices if applicable
             if is_scd:
                 idx_validfrom = columns.index("ValidFromDate")
                 idx_validto = columns.index("ValidToDate")
                 idx_iscurrent = columns.index("IsCurrent")
                 idx_version = columns.index("Version")
-            ch_map = {row[nk_idx]: row for row in ch_rows}
-            pg_map = {row[nk_idx]: row for row in pg_rows}
+                print(
+                    f"[{table}] SCD indices - ValidFrom: {idx_validfrom}, ValidTo: {idx_validto}, IsCurrent: {idx_iscurrent}, Version: {idx_version}")
+
+            # Build lookup maps with progress tracking
+            print(f"[{table}] Building ClickHouse lookup map...")
+            ch_map = {}
+            for idx, row in enumerate(ch_rows):
+                if idx % 10000 == 0 and idx > 0:
+                    print(f"[{table}] Processed {idx}/{len(ch_rows)} ClickHouse rows...")
+
+                row_list = list(row)
+                # Coerce date columns in ClickHouse data
+                if is_scd:
+                    row_list[idx_validfrom] = _coerce_to_date(row_list[idx_validfrom])
+                    row_list[idx_validto] = _coerce_to_date(row_list[idx_validto])
+                ch_map[row_list[nk_idx]] = row_list
+
+            print(f"[{table}] Building PostgreSQL lookup map...")
+            pg_map = {}
+            for idx, row in enumerate(pg_rows):
+                if idx % 10000 == 0 and idx > 0:
+                    print(f"[{table}] Processed {idx}/{len(pg_rows)} PostgreSQL rows...")
+
+                row_list = list(row)
+                # Coerce date columns in PostgreSQL data
+                if is_scd:
+                    row_list[idx_validfrom] = _coerce_to_date(row_list[idx_validfrom])
+                    row_list[idx_validto] = _coerce_to_date(row_list[idx_validto])
+                pg_map[row_list[nk_idx]] = row_list
+
+            # Free up memory
+            del pg_rows
+            del ch_rows
+            gc.collect()
+
             ch_keys = set(ch_map.keys())
             pg_keys = set(pg_map.keys())
+
+            print(f"[{table}] Keys - PG: {len(pg_keys)}, CH: {len(ch_keys)}")
+
+            # Track changes
             to_insert = []
             to_delete = []
             to_update = []
             scd_expire_updates = []
             scd_expire_deletes = []
+
+            # New records in source (not in warehouse)
+            print(f"[{table}] Finding new records...")
             for key in pg_keys - ch_keys:
                 row = list(pg_map[key])
                 if is_scd:
@@ -762,20 +827,53 @@ def populate():
                     row[idx_validto] = FAR_FUTURE_DATE
                     row[idx_validfrom] = _coerce_to_date(row[idx_validfrom])
                 to_insert.append(row)
+
+            # Deleted records in source (exist in warehouse but not in source)
+            print(f"[{table}] Finding deleted records...")
             for key in ch_keys - pg_keys:
                 if is_scd:
                     scd_expire_deletes.append(key)
                 else:
                     to_delete.append(key)
+
+            # Changed records (exist in both) - THIS IS THE DANGEROUS PART
+            print(f"[{table}] Comparing changed records...")
+            comparison_count = 0
             for key in pg_keys & ch_keys:
+                comparison_count += 1
+                if comparison_count % 5000 == 0:
+                    print(f"[{table}] Compared {comparison_count}/{len(pg_keys & ch_keys)} records...")
+
                 pg_row = list(pg_map[key])
                 ch_row = list(ch_map[key])
+
                 if is_scd:
+                    # For SCD, exclude surrogate key, ValidToDate, IsCurrent, and Version from comparison
                     exclude = {0, idx_validto, idx_iscurrent, idx_version}
-                    compare_idx = [i for i in range(len(columns)) if i not in exclude]
-                    if [pg_row[i] for i in compare_idx] != [ch_row[i] for i in compare_idx]:
+
+                    # Simple direct comparison without helper function
+                    rows_differ = False
+                    for i in range(len(columns)):
+                        if i in exclude:
+                            continue
+
+                        pg_val = pg_row[i]
+                        ch_val = ch_row[i]
+
+                        # Handle dates
+                        if i == idx_validfrom:
+                            pg_val = _coerce_to_date(pg_val)
+                            ch_val = _coerce_to_date(ch_val)
+
+                        if pg_val != ch_val:
+                            rows_differ = True
+                            break
+
+                    if rows_differ:
                         pg_vf = _coerce_to_date(pg_row[idx_validfrom])
                         ch_vf = _coerce_to_date(ch_row[idx_validfrom])
+
+                        # Only create new version if ValidFromDate has advanced
                         if pg_vf > ch_vf:
                             old_ver = int(ch_row[idx_version] or 0)
                             pg_row[idx_version] = old_ver + 1
@@ -785,14 +883,24 @@ def populate():
                             to_insert.append(pg_row)
                             scd_expire_updates.append((key, pg_vf))
                 else:
+                    # For non-SCD, simple comparison excluding surrogate key
                     if pg_row[1:] != ch_row[1:]:
-                        to_update.append(pg_row)
+                        to_update.append((key, pg_row))
+
+            # Free more memory
+            del pg_map
+            del ch_map
+            gc.collect()
+
             print(
                 f"[{table}] Summary: insert={len(to_insert)}, "
                 f"update={len(to_update) if not is_scd else len(scd_expire_updates)}, "
                 f"delete={len(to_delete) if not is_scd else len(scd_expire_deletes)}"
             )
+
+            # Execute deletes for non-SCD tables
             if to_delete:
+                print(f"[{table}] Executing {len(to_delete)} deletes...")
                 try:
                     if isinstance(to_delete[0], str):
                         key_list = ",".join(_sql_quote(k) for k in to_delete)
@@ -803,6 +911,7 @@ def populate():
                     )
                     client.command(f"OPTIMIZE TABLE ADVENTUREWORKS_DWS.{table} FINAL")
                 except Exception as e:
+                    print(f"[{table}] Delete failed: {e}")
                     err = build_error_record(
                         source_table=table,
                         record_natural_key="delete_batch",
@@ -815,7 +924,10 @@ def populate():
                         is_recoverable=1,
                     )
                     error_rows.append(err)
+
+            # Expire deleted records for SCD tables
             if is_scd and scd_expire_deletes:
+                print(f"[{table}] Expiring {len(scd_expire_deletes)} deleted records...")
                 try:
                     today = date.today()
                     if isinstance(scd_expire_deletes[0], str):
@@ -829,6 +941,7 @@ def populate():
                     )
                     client.command(f"OPTIMIZE TABLE ADVENTUREWORKS_DWS.{table} FINAL")
                 except Exception as e:
+                    print(f"[{table}] Expire deletes failed: {e}")
                     err = build_error_record(
                         source_table=table,
                         record_natural_key="expire_delete_batch",
@@ -841,17 +954,30 @@ def populate():
                         is_recoverable=1,
                     )
                     error_rows.append(err)
+
+            # Expire old versions for SCD updates (BATCHED)
             if is_scd and scd_expire_updates:
+                print(f"[{table}] Expiring {len(scd_expire_updates)} updated records...")
                 try:
-                    for key, new_vf in scd_expire_updates:
-                        key_sql = _sql_quote(key) if isinstance(key, str) else str(key)
-                        client.command(
-                            f"ALTER TABLE ADVENTUREWORKS_DWS.{table} "
-                            f"UPDATE IsCurrent = 0, ValidToDate = {_date_sql(new_vf)} "
-                            f"WHERE {natural_key} = {key_sql} AND IsCurrent = 1"
-                        )
+                    # Batch all expire operations into a single UPDATE command
+                    keys_to_expire = [key for key, _ in scd_expire_updates]
+
+                    if isinstance(keys_to_expire[0], str):
+                        key_list = ",".join(_sql_quote(k) for k in keys_to_expire)
+                    else:
+                        key_list = ",".join(str(k) for k in keys_to_expire)
+
+                    # Use the minimum new ValidFromDate as the expire date
+                    expire_date = min(new_vf for _, new_vf in scd_expire_updates)
+
+                    client.command(
+                        f"ALTER TABLE ADVENTUREWORKS_DWS.{table} "
+                        f"UPDATE IsCurrent = 0, ValidToDate = {_date_sql(expire_date)} "
+                        f"WHERE {natural_key} IN ({key_list}) AND IsCurrent = 1"
+                    )
                     client.command(f"OPTIMIZE TABLE ADVENTUREWORKS_DWS.{table} FINAL")
                 except Exception as e:
+                    print(f"[{table}] Expire updates failed: {e}")
                     err = build_error_record(
                         source_table=table,
                         record_natural_key="expire_update_batch",
@@ -867,24 +993,37 @@ def populate():
                         is_recoverable=1,
                     )
                     error_rows.append(err)
+
+            # Handle updates for non-SCD tables (DELETE + INSERT pattern)
             if not is_scd and to_update:
+                print(f"[{table}] Updating {len(to_update)} records...")
                 try:
-                    update_keys = [row[nk_idx] for row in to_update]
+                    # First delete the old records
+                    update_keys = [key for key, _ in to_update]
                     if isinstance(update_keys[0], str):
                         key_list = ",".join(_sql_quote(k) for k in update_keys)
                     else:
                         key_list = ",".join(str(k) for k in update_keys)
+
+                    client.command(
+                        f"ALTER TABLE ADVENTUREWORKS_DWS.{table} DELETE WHERE {natural_key} IN ({key_list})"
+                    )
+
+                    # Then insert the updated records
+                    updated_rows = [row for _, row in to_update]
                     batch_size = 200
-                    for i in range(0, len(to_update), batch_size):
-                        batch = to_update[i : i + batch_size]
+                    for i in range(0, len(updated_rows), batch_size):
+                        batch = updated_rows[i: i + batch_size]
                         check_insert(batch, columns)
                         client.insert(
                             f"ADVENTUREWORKS_DWS.{table}",
                             batch,
                             column_names=columns,
                         )
+
                     client.command(f"OPTIMIZE TABLE ADVENTUREWORKS_DWS.{table} FINAL")
                 except Exception as e:
+                    print(f"[{table}] Update failed: {e}")
                     err = build_error_record(
                         source_table=table,
                         record_natural_key="update_batch",
@@ -900,11 +1039,16 @@ def populate():
                         is_recoverable=1,
                     )
                     error_rows.append(err)
+
+            # Insert new records (both new keys and new SCD versions)
             if to_insert:
+                print(f"[{table}] Inserting {len(to_insert)} records...")
                 try:
                     batch_size = 200
                     for i in range(0, len(to_insert), batch_size):
-                        batch = to_insert[i : i + batch_size]
+                        if i % 2000 == 0 and i > 0:
+                            print(f"[{table}] Inserted {i}/{len(to_insert)} records...")
+                        batch = to_insert[i: i + batch_size]
                         check_insert(batch, columns)
                         client.insert(
                             f"ADVENTUREWORKS_DWS.{table}",
@@ -912,6 +1056,8 @@ def populate():
                             column_names=columns,
                         )
                 except Exception as e:
+                    print(f"[{table}] Insert failed: {e}")
+                    traceback.print_exc()
                     err = build_error_record(
                         source_table=table,
                         record_natural_key="insert_batch",
@@ -927,8 +1073,11 @@ def populate():
                         is_recoverable=1,
                     )
                     error_rows.append(err)
+
+            # Log any errors to error tracking table
             if error_rows:
                 insert_error_records(client, error_rows)
+
             print(f"[INFO] {table}: Batch {processing_batch_id} complete")
             return {
                 "inserted": len(to_insert),
@@ -936,11 +1085,20 @@ def populate():
                 "deleted": len(to_delete) if not is_scd else len(scd_expire_deletes),
                 "errors": len(error_rows),
             }
+
+        except Exception as e:
+            print(f"[ERROR] {table}: Fatal error - {e}")
+            traceback.print_exc()
+            raise
+
         finally:
-            try:
-                client.close()
-            except Exception:
-                pass
+            # Cleanup
+            if client:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+            gc.collect()
 
     @task
     def insert_static_dimension_columns(data, table, columns):
